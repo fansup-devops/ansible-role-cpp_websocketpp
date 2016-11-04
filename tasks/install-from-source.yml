@@ -1,0 +1,78 @@
+---
+- name: Ensure websocketpp's dependencies are installed (Debian).
+  apt: "pkg={{ item }} state=installed"
+  with_items:
+    - gcc
+    - make
+    - libc6-dev
+    - g++
+    - cmake
+    - scons
+  when: ansible_os_family == 'Debian'
+
+- name: Get installed version
+  shell: "test -e {{ cpp_websocketpp_install_path }}/include/websocketpp/version.hpp && (cat {{ cpp_websocketpp_install_path }}/include/websocketpp/version.hpp | grep -E '^static int const (major|minor|patch)_version =' | sed -n '1,3p' | awk -F= '{print $2}' | sed 's!;!!' | xargs echo | sed 's! !.!g')"
+  changed_when: false
+  failed_when: false
+  register: websocketpp_installed_version
+
+- name: Force websocketpp install if the version numbers do not match
+  set_fact:
+    cpp_websocketpp_reinstall_from_source: true
+  when: 'cpp_websocketpp_install_from_source_force_update and (websocketpp_installed_version|success and (websocketpp_installed_version.stdout | regex_replace("^.*?([0-9\.]+)$", "\\1") | version_compare(cpp_websocketpp_version, operator="!=")))'
+
+- name: Download websocketpp.
+  get_url:
+    url: "https://github.com/zaphoyd/websocketpp/archive/{{ cpp_websocketpp_github_branch }}.tar.gz"
+    dest: "{{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}.tar.gz"
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+
+- name: Expand websocketpp archive.
+  unarchive:
+    src: "{{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}.tar.gz"
+    dest: "{{ workspace }}"
+    creates: "{{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}/README.md"
+    copy: no
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+
+- name: Mkdir build directory.
+  file:
+    path: "{{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}/build"
+    state: directory
+    owner: "root"
+    group: "root"
+    mode: 0750
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+
+- name: Build websocketpp with scons.
+  shell: >
+    WSPP_ENABLE_CPP11=1 BOOST_LIBS={{ cpp_websocketpp_boost_libs }} BOOST_INCLUDES={{ cpp_websocketpp_boost_includes }} scons {{ item }}
+  args:
+    chdir: "{{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}"
+  with_items:
+    -
+    - test
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+  become: yes
+
+- name: Build websocketpp with cmake.
+  command: >
+    cmake -DCMAKE_INSTALL_PREFIX={{ cpp_websocketpp_install_path }} ..
+    chdir={{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}/build
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+  become: yes
+
+- name: Build websocketpp.
+  command: >
+    make {{ item }}
+    chdir={{ workspace }}/websocketpp-{{ cpp_websocketpp_github_archive }}/build
+  with_items:
+    - all
+    - install
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+  become: yes
+
+- name: Run ldconfig
+  shell: ldconfig
+  when: websocketpp_installed_version|failed or cpp_websocketpp_reinstall_from_source
+  become: yes

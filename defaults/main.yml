@@ -1,0 +1,20 @@
+---
+workspace: /usr/local/src
+
+# If set to TRUE, websocketpp will be installed from source, using the version set with
+# the 'cpp_websocketpp_version' variable instead of using a package.
+cpp_websocketpp_install_from_source: true
+cpp_websocketpp_install_path: "/usr/local"
+cpp_websocketpp_version: "0.7.0"
+cpp_websocketpp_github_branch: "0.7.0"
+cpp_websocketpp_github_archive: "0.7.0"
+
+# If websocketpp is already installed at and older version, force a new source build.
+# Only applies if cpp_websocketpp_install_from_source is `true`.
+cpp_websocketpp_install_from_source_force_update: false
+
+# Leave this at it's default.
+cpp_websocketpp_reinstall_from_source: false
+
+cpp_websocketpp_boost_libs: /usr/lib
+cpp_websocketpp_boost_includes: /usr/include/boost
